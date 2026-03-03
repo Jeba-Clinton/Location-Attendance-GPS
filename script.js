@@ -1,70 +1,4 @@
 
-
-// document.getElementById("attendanceForm").addEventListener("submit", function(e) {
-//     e.preventDefault();
-//     getLocation();
-// });
-
-// async function getLocation() {
-
-//     const empId = document.getElementById("empId").value;
-//     const name = document.getElementById("name").value;
-//     const status = document.getElementById("status").value;
-
-//     if (!empId || !name || !status) {
-//         alert("Please fill all fields");
-//         return;
-//     }
-
-//     if (!navigator.geolocation) {
-//         alert("Geolocation not supported");
-//         return;
-//     }
-
-//     navigator.geolocation.getCurrentPosition(async function(position) {
-
-//         const latitude = position.coords.latitude;
-//         const longitude = position.coords.longitude;
-
-//         try {
-
-//             // PUT YOUR GOOGLE API KEY HERE
-//             const apiKey = "AIzaSyB1gNkyUqbL9rVLUyAys45xKKaPcqwUfhM";
-
-//             const response = await fetch(
-//                 `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`
-//             );
-
-//             const data = await response.json();
-//             console.log(data);
-
-//             if (data.status === "OK") {
-
-//                 const address = data.results[0].formatted_address;
-
-//                 document.getElementById("locationDisplay").innerText =
-//                     "Your Location: " + address;
-
-//             } else {
-//                 document.getElementById("locationDisplay").innerText =
-//                     "Location not found";
-//             }
-
-//         } catch (error) {
-//             console.error(error);
-//             alert("Error getting location");
-//         }
-
-//     }, function() {
-//         alert("Location permission denied");
-//     });
-// }
-
-
-
-
-// free
-
 document.getElementById("attendanceForm").addEventListener("submit", function(e) {
     e.preventDefault();
     getLocation();
@@ -72,321 +6,127 @@ document.getElementById("attendanceForm").addEventListener("submit", function(e)
 
 async function getLocation() {
 
-    const empId = document.getElementById("empId").value;
-    const name = document.getElementById("name").value;
+    const empId = document.getElementById("empId").value.trim();
+    const name = document.getElementById("name").value.trim();
     const status = document.getElementById("status").value;
+    const locationDisplay = document.getElementById("locationDisplay");
 
+    // ✅ Validate inputs
     if (!empId || !name || !status) {
         alert("Please fill all fields");
         return;
     }
 
     if (!navigator.geolocation) {
-        alert("Geolocation not supported");
+        alert("Geolocation not supported by this browser");
         return;
     }
 
-    navigator.geolocation.getCurrentPosition(async function(position) {
+    locationDisplay.innerText = "Getting accurate location... ⏳";
 
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
+    const options = {
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0
+    };
 
-        console.log("Accuracy :"+ position.coords.accuracy);
+    navigator.geolocation.getCurrentPosition(
 
-        try {
+        async function(position) {
 
-            // FREE OpenStreetMap Reverse Geocoding
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-            );
+            const latitude = position.coords.latitude;
+            const longitude = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
 
-            const data = await response.json();
-            console.log(data);
+            console.log("Latitude:", latitude);
+            console.log("Longitude:", longitude);
+            console.log("Accuracy:", accuracy);
 
-            if (data && data.display_name) {
-
-                const address = data.display_name;
-
-                document.getElementById("locationDisplay").innerText =
-                    "Your Location: " + address;
-
-            } else {
-                document.getElementById("locationDisplay").innerText =
-                    "Location not found";
+            // 🔥 Reject if accuracy too low
+            if (accuracy > 100) {
+                locationDisplay.innerText =
+                    `Low GPS Accuracy (${Math.round(accuracy)} meters).
+                     Please move to open area and try again.`;
+                return;
             }
 
-        } catch (error) {
-            console.error(error);
-            alert("Error getting location");
-        }
+            try {
 
-    }, function() {
-        alert("Location permission denied");
-    });
- }
-// document.getElementById("attendanceForm").addEventListener("submit", function(e) {
-//     e.preventDefault();
-//     getLocation();
-// });
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=19&addressdetails=1`,
+                    {
+                        headers: {
+                            "Accept": "application/json"
+                        }
+                    }
+                );
 
-// async function getLocation() {
+                if (!response.ok) {
+                    throw new Error("Network response failed");
+                }
 
-//     const empId = document.getElementById("empId").value.trim();
-//     const name = document.getElementById("name").value.trim();
-//     const status = document.getElementById("status").value;
-//     const locationDisplay = document.getElementById("locationDisplay");
+                const data = await response.json();
 
-//     // ✅ Validate inputs
-//     if (!empId || !name || !status) {
-//         alert("Please fill all fields");
-//         return;
-//     }
+                if (data && data.address) {
 
-//     if (!navigator.geolocation) {
-//         alert("Geolocation not supported by this browser");
-//         return;
-//     }
+                    const a = data.address;
 
-//     locationDisplay.innerText = "Getting accurate location... ⏳";
+                    // 🔥 Only Village, City, State
+                    const village =
+                        a.village ||
+                        a.suburb ||
+                        a.neighbourhood ||
+                        "";
 
-//     const options = {
-//         enableHighAccuracy: true,
-//         timeout: 20000,
-//         maximumAge: 0
-//     };
+                    const city =
+                        a.city ||
+                        a.town ||
+                        a.municipality ||
+                        a.county ||
+                        "";
 
-//     navigator.geolocation.getCurrentPosition(
+                    const state = a.state || "";
 
-//         async function(position) {
+                    const cleanAddress = `${village}, ${city}, ${state}`;
 
-//             const latitude = position.coords.latitude;
-//             const longitude = position.coords.longitude;
-//             const accuracy = position.coords.accuracy;
+                    locationDisplay.innerHTML = `
+                        ✅ Attendance Marked<br><br>
+                        👤 Name: ${name}<br>
+                        🆔 Employee ID: ${empId}<br>
+                        📍 Location: ${cleanAddress}<br>
+                        🎯 Accuracy: ${Math.round(accuracy)} meters
+                    `;
 
-//             console.log("Latitude:", latitude);
-//             console.log("Longitude:", longitude);
-//             console.log("Accuracy:", accuracy);
+                } else {
+                    locationDisplay.innerText = "Location not found";
+                }
 
-//             // 🔥 Reject if accuracy too low
-//             if (accuracy > 100) {
-//                 locationDisplay.innerText =
-//                     `Low GPS Accuracy (${Math.round(accuracy)} meters).
-//                      Please move to open area and try again.`;
-//                 return;
-//             }
+            } catch (error) {
+                console.error(error);
+                locationDisplay.innerText =
+                    "Error fetching address. Check internet connection.";
+            }
 
-//             try {
+        },
 
-//                 const response = await fetch(
-//                     `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=19&addressdetails=1`,
-//                     {
-//                         headers: {
-//                             "Accept": "application/json"
-//                         }
-//                     }
-//                 );
+        function(error) {
 
-//                 if (!response.ok) {
-//                     throw new Error("Network response failed");
-//                 }
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    locationDisplay.innerText = "Location permission denied.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    locationDisplay.innerText = "Location unavailable.";
+                    break;
+                case error.TIMEOUT:
+                    locationDisplay.innerText = "Location request timed out.";
+                    break;
+                default:
+                    locationDisplay.innerText = "Unknown error occurred.";
+            }
 
-//                 const data = await response.json();
+        },
 
-//                 if (data && data.address) {
-
-//                     const a = data.address;
-
-//                     // 🔥 Only Village, City, State
-//                     const village =
-//                         a.village ||
-//                         a.suburb ||
-//                         a.neighbourhood ||
-//                         "";
-
-//                     const city =
-//                         a.city ||
-//                         a.town ||
-//                         a.municipality ||
-//                         a.county ||
-//                         "";
-
-//                     const state = a.state || "";
-
-//                     const cleanAddress = `${village}, ${city}, ${state}`;
-
-//                     locationDisplay.innerHTML = `
-//                         ✅ Attendance Marked<br><br>
-//                         👤 Name: ${name}<br>
-//                         🆔 Employee ID: ${empId}<br>
-//                         📍 Location: ${cleanAddress}<br>
-//                         🎯 Accuracy: ${Math.round(accuracy)} meters
-//                     `;
-
-//                 } else {
-//                     locationDisplay.innerText = "Location not found";
-//                 }
-
-//             } catch (error) {
-//                 console.error(error);
-//                 locationDisplay.innerText =
-//                     "Error fetching address. Check internet connection.";
-//             }
-
-//         },
-
-//         function(error) {
-
-//             switch (error.code) {
-//                 case error.PERMISSION_DENIED:
-//                     locationDisplay.innerText = "Location permission denied.";
-//                     break;
-//                 case error.POSITION_UNAVAILABLE:
-//                     locationDisplay.innerText = "Location unavailable.";
-//                     break;
-//                 case error.TIMEOUT:
-//                     locationDisplay.innerText = "Location request timed out.";
-//                     break;
-//                 default:
-//                     locationDisplay.innerText = "Unknown error occurred.";
-//             }
-
-//         },
-
-//         options
-//     );
-
-// }document.getElementById("attendanceForm").addEventListener("submit", function(e) {
-//     e.preventDefault();
-//     getLocation();
-// });
-
-// async function getLocation() {
-
-//     const empId = document.getElementById("empId").value.trim();
-//     const name = document.getElementById("name").value.trim();
-//     const status = document.getElementById("status").value;
-//     const locationDisplay = document.getElementById("locationDisplay");
-
-//     // ✅ Validate inputs
-//     if (!empId || !name || !status) {
-//         alert("Please fill all fields");
-//         return;
-//     }
-
-//     if (!navigator.geolocation) {
-//         alert("Geolocation not supported by this browser");
-//         return;
-//     }
-
-//     locationDisplay.innerText = "Getting accurate location... ⏳";
-
-//     const options = {
-//         enableHighAccuracy: true,
-//         timeout: 20000,
-//         maximumAge: 0
-//     };
-
-//     navigator.geolocation.getCurrentPosition(
-
-//         async function(position) {
-
-//             const latitude = position.coords.latitude;
-//             const longitude = position.coords.longitude;
-//             const accuracy = position.coords.accuracy;
-
-//             // ❌ Reject if very low accuracy
-//             if (accuracy > 100) {
-//                 locationDisplay.innerText =
-//                     `Low GPS Accuracy (${Math.round(accuracy)} meters).
-//                      Please move to open area and try again.`;
-//                 return;
-//             }
-
-//             try {
-
-//                 const response = await fetch(
-//                     `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
-//                     {
-//                         headers: {
-//                             "Accept": "application/json"
-//                         }
-//                     }
-//                 );
-
-//                 if (!response.ok) {
-//                     throw new Error("Network response failed");
-//                 }
-
-//                 const data = await response.json();
-
-//                 if (data && data.address) {
-
-//                     const a = data.address;
-
-//                     // 🔥 1️⃣ Get Village / Area Name (Priority order)
-//                     const village =
-//                         a.village ||
-//                         a.hamlet ||
-//                         a.suburb ||
-//                         a.neighbourhood ||
-//                         a.residential ||
-//                         "";
-
-//                     // 🔥 2️⃣ Get Nearest Town / City
-//                     const townOrCity =
-//                         a.town ||
-//                         a.city ||
-//                         a.municipality ||
-//                         a.county ||
-//                         "";
-
-//                     // 🔥 3️⃣ State
-//                     const state = a.state || "";
-
-//                     // 🔥 Remove empty values safely
-//                     const cleanAddress = [village, townOrCity, state]
-//                         .filter(part => part && part.trim() !== "")
-//                         .join(", ");
-
-//                     locationDisplay.innerHTML = `
-//                         ✅ Attendance Marked<br><br>
-//                         👤 Name: ${name}<br>
-//                         🆔 Employee ID: ${empId}<br>
-//                         📍 Location: ${cleanAddress}<br>
-//                         🎯 Accuracy: ${Math.round(accuracy)} meters
-//                     `;
-
-//                 } else {
-//                     locationDisplay.innerText = "Location not found";
-//                 }
-
-//             } catch (error) {
-//                 console.error(error);
-//                 locationDisplay.innerText =
-//                     "Error fetching address. Check internet connection.";
-//             }
-
-//         },
-
-//         function(error) {
-
-//             switch (error.code) {
-//                 case error.PERMISSION_DENIED:
-//                     locationDisplay.innerText = "Location permission denied.";
-//                     break;
-//                 case error.POSITION_UNAVAILABLE:
-//                     locationDisplay.innerText = "Location unavailable.";
-//                     break;
-//                 case error.TIMEOUT:
-//                     locationDisplay.innerText = "Location request timed out.";
-//                     break;
-//                 default:
-//                     locationDisplay.innerText = "Unknown error occurred.";
-//             }
-
-//         },
-
-//         options
-//     );
-// }
-
+        options
+    );
+}
